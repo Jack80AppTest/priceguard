@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PriceGuard</string>
+    <string name="choose_receipt">Choisir un reçu</string>
+    <string name="open_external_link">Ouvrir le lien</string>
+</resources>
