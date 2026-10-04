@@ -3,7 +3,6 @@ package com.jack80apptest.priceguard;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
@@ -156,11 +155,6 @@ public class MainActivity extends ComponentActivity {
             if (request.isForMainFrame()) {
                 showConnectionError();
             }
-        }
-
-        @Override
-        public void onPageStarted(WebView view, String url, Bitmap favicon) {
-            super.onPageStarted(view, url, favicon);
         }
 
         @Override

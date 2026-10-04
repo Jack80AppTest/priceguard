@@ -1,2 +1,2 @@
-# PriceGuard v0.1.0
+# PriceGuard
 # No custom ProGuard/R8 rules are currently required.
