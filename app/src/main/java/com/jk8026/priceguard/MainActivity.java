@@ -1,4 +1,4 @@
-package com.jack80apptest.priceguard;
+package com.jk8026.priceguard;
 
 import android.content.ClipData;
 import android.content.Intent;
