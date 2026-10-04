@@ -1,11 +1,11 @@
 package com.jack80apptest.priceguard;
 
-import android.app.Activity;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -19,15 +19,16 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.content.FileProvider;
-
-import android.net.http.SslError;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
-public class MainActivity extends Activity {
+public class MainActivity extends ComponentActivity {
 
     private static final String HOME_URL = "https://priceguard.ca/";
     private static final int FILE_CHOOSER_REQUEST = 1001;
@@ -35,6 +36,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraImageUri;
+    private OnBackPressedCallback webBackCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,17 +46,27 @@ public class MainActivity extends Activity {
         setContentView(webView);
 
         configureWebView();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-                    this::handleBackNavigation
-            );
-        }
+        configureBackNavigation();
 
         if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
             webView.loadUrl(HOME_URL);
         }
+    }
+
+    private void configureBackNavigation() {
+        webBackCallback = new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                if (webView != null && webView.canGoBack()) {
+                    webView.goBack();
+                } else {
+                    setEnabled(false);
+                    finish();
+                }
+            }
+        };
+
+        getOnBackPressedDispatcher().addCallback(this, webBackCallback);
     }
 
     private void configureWebView() {
@@ -106,10 +118,12 @@ public class MainActivity extends Activity {
 
             if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
                 String host = uri.getHost();
-                if (host != null
-                        && (host.equalsIgnoreCase("priceguard.ca")
-                        || host.toLowerCase().endsWith(".priceguard.ca"))) {
-                    return false;
+                if (host != null) {
+                    String normalizedHost = host.toLowerCase(Locale.US);
+                    if (normalizedHost.equals("priceguard.ca")
+                            || normalizedHost.endsWith(".priceguard.ca")) {
+                        return false;
+                    }
                 }
 
                 openExternal(uri);
@@ -147,6 +161,14 @@ public class MainActivity extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
             super.onPageStarted(view, url, favicon);
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
+            if (webBackCallback != null) {
+                webBackCallback.setEnabled(view.canGoBack());
+            }
         }
     }
 
@@ -296,20 +318,6 @@ public class MainActivity extends Activity {
                 "UTF-8",
                 null
         );
-    }
-
-    private void handleBackNavigation() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            finish();
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
-    public void onBackPressed() {
-        handleBackNavigation();
     }
 
     @Override
