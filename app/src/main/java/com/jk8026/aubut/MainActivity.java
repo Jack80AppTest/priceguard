@@ -1,4 +1,4 @@
-package com.jk8026.priceguard;
+package com.jk8026.aubut;
 
 import android.content.ClipData;
 import android.content.Intent;
@@ -29,7 +29,7 @@ import java.util.Locale;
 
 public class MainActivity extends ComponentActivity {
 
-    private static final String HOME_URL = "https://priceguard.ca/";
+    private static final String HOME_URL = "https://www.aubut.ca/circulaires";
     private static final int FILE_CHOOSER_REQUEST = 1001;
 
     private WebView webView;
@@ -89,11 +89,11 @@ public class MainActivity extends ComponentActivity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
-        webView.setWebViewClient(new PriceGuardWebViewClient());
-        webView.setWebChromeClient(new PriceGuardChromeClient());
+        webView.setWebViewClient(new AubutWebViewClient());
+        webView.setWebChromeClient(new AubutChromeClient());
     }
 
-    private final class PriceGuardWebViewClient extends WebViewClient {
+    private final class AubutWebViewClient extends WebViewClient {
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -109,7 +109,7 @@ public class MainActivity extends ComponentActivity {
         private boolean handleUrl(Uri uri) {
             String scheme = uri.getScheme();
 
-            if ("priceguard-app".equalsIgnoreCase(scheme)
+            if ("aubut-app".equalsIgnoreCase(scheme)
                     && "retry".equalsIgnoreCase(uri.getHost())) {
                 webView.loadUrl(HOME_URL);
                 return true;
@@ -119,8 +119,8 @@ public class MainActivity extends ComponentActivity {
                 String host = uri.getHost();
                 if (host != null) {
                     String normalizedHost = host.toLowerCase(Locale.US);
-                    if (normalizedHost.equals("priceguard.ca")
-                            || normalizedHost.endsWith(".priceguard.ca")) {
+                    if (normalizedHost.equals("aubut.ca")
+                            || normalizedHost.endsWith(".aubut.ca")) {
                         return false;
                     }
                 }
@@ -166,7 +166,7 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
-    private final class PriceGuardChromeClient extends WebChromeClient {
+    private final class AubutChromeClient extends WebChromeClient {
 
         @Override
         public boolean onShowFileChooser(
@@ -190,7 +190,7 @@ public class MainActivity extends ComponentActivity {
 
             Intent chooser = Intent.createChooser(
                     fileIntent,
-                    getString(R.string.choose_receipt)
+                    getString(R.string.choose_file)
             );
 
             Intent cameraIntent = createCameraIntent();
@@ -219,7 +219,7 @@ public class MainActivity extends ComponentActivity {
 
         try {
             File imageFile = File.createTempFile(
-                    "priceguard_receipt_",
+                    "aubut_file_",
                     ".jpg",
                     getCacheDir()
             );
@@ -236,7 +236,7 @@ public class MainActivity extends ComponentActivity {
                             | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             );
             cameraIntent.setClipData(
-                    ClipData.newRawUri("priceguard_receipt", cameraImageUri)
+                    ClipData.newRawUri("aubut_file", cameraImageUri)
             );
 
             List<ResolveInfo> cameraActivities = getPackageManager().queryIntentActivities(
@@ -299,7 +299,7 @@ public class MainActivity extends ComponentActivity {
                         + "<body style=\"font-family:sans-serif;padding:32px;text-align:center;\">"
                         + "<h2>Connexion impossible</h2>"
                         + "<p>Vérifie ta connexion Internet, puis réessaie.</p>"
-                        + "<p><a href=\"priceguard-app://retry\" "
+                        + "<p><a href=\"aubut-app://retry\" "
                         + "style=\"display:inline-block;padding:12px 18px;"
                         + "background:#1565C0;color:white;text-decoration:none;"
                         + "border-radius:8px;\">Réessayer</a></p>"
