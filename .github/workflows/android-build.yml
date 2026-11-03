@@ -3,7 +3,7 @@ name: Android APK
 on:
   push:
     branches:
-      - "dev/aubut-v0.1.0"
+      - "dev/aubut-v0.1.1-icon"
   workflow_dispatch:
 
 jobs:
@@ -31,17 +31,67 @@ jobs:
       - name: Install Android SDK 36
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
+      - name: Prepare Aubut launcher icon
+        run: |
+          python3 -m pip install --quiet pillow
+          mkdir -p app/src/main/res/drawable-nodpi
+          curl -L --fail --retry 3 \
+            "https://la-toile.ca/celimg/data/media_uploads/distribution-alimentaire-aubut_logo_1.jpg" \
+            -o /tmp/aubut-logo-source.jpg
+          python3 - <<'PY'
+          from PIL import Image, ImageChops
+          from pathlib import Path
+
+          src = Image.open("/tmp/aubut-logo-source.jpg").convert("RGB")
+
+          # Automatic cleanup of large near-white borders when present.
+          threshold = 245
+          mask = Image.new("L", src.size, 0)
+          pix = src.load()
+          m = mask.load()
+          for y in range(src.height):
+              for x in range(src.width):
+                  r, g, b = pix[x, y]
+                  if not (r >= threshold and g >= threshold and b >= threshold):
+                      m[x, y] = 255
+
+          bbox = mask.getbbox()
+          if bbox:
+              left, top, right, bottom = bbox
+              # Only crop if the detected border is meaningfully large.
+              margin_x = min(left, src.width - right)
+              margin_y = min(top, src.height - bottom)
+              if margin_x > src.width * 0.03 or margin_y > src.height * 0.03:
+                  src = src.crop(bbox)
+
+          # Fit into a square without distorting the logo.
+          target = 512
+          src.thumbnail((target, target), Image.Resampling.LANCZOS)
+
+          # Use a sampled corner/background colour rather than forced white.
+          bg = src.getpixel((0, 0))
+          canvas = Image.new("RGB", (target, target), bg)
+          x = (target - src.width) // 2
+          y = (target - src.height) // 2
+          canvas.paste(src, (x, y))
+          canvas.save(
+              "app/src/main/res/drawable-nodpi/aubut_logo.png",
+              "PNG",
+              optimize=True
+          )
+          PY
+
       - name: Lint and build APK
         run: gradle --no-daemon clean lintDebug assembleDebug
 
       - name: Prepare APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/Aubut-v0.1.0-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output/Aubut-v0.1.1-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Aubut-v0.1.0-debug
-          path: output/Aubut-v0.1.0-debug.apk
+          name: Aubut-v0.1.1-debug
+          path: output/Aubut-v0.1.1-debug.apk
           if-no-files-found: error
