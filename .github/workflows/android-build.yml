@@ -3,7 +3,7 @@ name: Android APK
 on:
   push:
     branches:
-      - "dev/v0.1.4-priceguard-links"
+      - "dev/v0.1.5-magiclink-diagnostic"
   workflow_dispatch:
 
 jobs:
@@ -37,11 +37,11 @@ jobs:
       - name: Prepare APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/PriceGuard-v0.1.4-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output/PriceGuard-v0.1.5-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PriceGuard-v0.1.4-debug
-          path: output/PriceGuard-v0.1.4-debug.apk
+          name: PriceGuard-v0.1.5-debug
+          path: output/PriceGuard-v0.1.5-debug.apk
           if-no-files-found: error
