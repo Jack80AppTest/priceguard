@@ -47,9 +47,43 @@ public class MainActivity extends ComponentActivity {
         configureWebView();
         configureBackNavigation();
 
-        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
+        Uri incomingUri = getIntent() != null ? getIntent().getData() : null;
+        if (isPriceGuardUri(incomingUri)) {
+            webView.loadUrl(incomingUri.toString());
+        } else if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
             webView.loadUrl(HOME_URL);
         }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+
+        Uri incomingUri = intent != null ? intent.getData() : null;
+        if (isPriceGuardUri(incomingUri) && webView != null) {
+            webView.loadUrl(incomingUri.toString());
+        }
+    }
+
+    private boolean isPriceGuardUri(Uri uri) {
+        if (uri == null) {
+            return false;
+        }
+
+        String scheme = uri.getScheme();
+        if (!"https".equalsIgnoreCase(scheme)) {
+            return false;
+        }
+
+        String host = uri.getHost();
+        if (host == null) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase(Locale.US);
+        return normalizedHost.equals("priceguard.ca")
+                || normalizedHost.endsWith(".priceguard.ca");
     }
 
     private void configureBackNavigation() {
@@ -116,13 +150,8 @@ public class MainActivity extends ComponentActivity {
             }
 
             if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
-                String host = uri.getHost();
-                if (host != null) {
-                    String normalizedHost = host.toLowerCase(Locale.US);
-                    if (normalizedHost.equals("priceguard.ca")
-                            || normalizedHost.endsWith(".priceguard.ca")) {
-                        return false;
-                    }
+                if (isPriceGuardUri(uri)) {
+                    return false;
                 }
 
                 openExternal(uri);
