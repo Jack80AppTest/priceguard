@@ -197,6 +197,24 @@ public class MainActivity extends ComponentActivity {
         view.evaluateJavascript(script, value -> addDiagnostic("JS état: " + value));
     }
 
+    private boolean isMagicLinkVerification(Uri source, Uri destination) {
+        return isDefaultHttpsOrigin(source, "app.priceguard.ca")
+                && "/auth/confirm".equals(source.getEncodedPath())
+                && isDefaultHttpsOrigin(
+                        destination,
+                        "waylslamfilmdatkqjun.supabase.co"
+                )
+                && "/auth/v1/verify".equals(destination.getEncodedPath());
+    }
+
+    private boolean isDefaultHttpsOrigin(Uri uri, String host) {
+        return uri != null
+                && "https".equalsIgnoreCase(uri.getScheme())
+                && host.equalsIgnoreCase(uri.getHost())
+                && uri.getUserInfo() == null
+                && (uri.getPort() == -1 || uri.getPort() == 443);
+    }
+
     private void configureBackNavigation() {
         webBackCallback = new OnBackPressedCallback(false) {
             @Override
@@ -254,7 +272,17 @@ public class MainActivity extends ComponentActivity {
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-            return handleUrl(request.getUrl());
+            Uri destination = request.getUrl();
+            String currentUrl = view.getUrl();
+
+            if (request.isForMainFrame()
+                    && "GET".equals(request.getMethod())
+                    && currentUrl != null
+                    && isMagicLinkVerification(Uri.parse(currentUrl), destination)) {
+                return false;
+            }
+
+            return handleUrl(destination);
         }
 
         @SuppressWarnings("deprecation")
