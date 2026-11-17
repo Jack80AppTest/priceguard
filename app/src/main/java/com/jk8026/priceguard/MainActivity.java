@@ -18,6 +18,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -296,6 +297,52 @@ public class MainActivity extends ComponentActivity {
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
             handler.cancel();
             showConnectionError();
+        }
+
+        @Override
+        public WebResourceResponse shouldInterceptRequest(
+                WebView view,
+                WebResourceRequest request
+        ) {
+            Uri uri = request.getUrl();
+            if (isAuthConfirmUrl(view != null ? view.getUrl() : null)
+                    && uri != null
+                    && uri.getHost() != null
+                    && (uri.getHost().equalsIgnoreCase("supabase.co")
+                        || uri.getHost().toLowerCase(Locale.US).endsWith(".supabase.co"))) {
+                addDiagnostic(
+                        "REQ Supabase: "
+                                + request.getMethod()
+                                + " "
+                                + sanitizeUrl(uri)
+                );
+            }
+            return super.shouldInterceptRequest(view, request);
+        }
+
+        @Override
+        public void onReceivedHttpError(
+                WebView view,
+                WebResourceRequest request,
+                WebResourceResponse errorResponse
+        ) {
+            Uri uri = request.getUrl();
+            boolean isSupabase = uri != null
+                    && uri.getHost() != null
+                    && (uri.getHost().equalsIgnoreCase("supabase.co")
+                        || uri.getHost().toLowerCase(Locale.US).endsWith(".supabase.co"));
+
+            if (isAuthConfirmUrl(view != null ? view.getUrl() : null) || isSupabase) {
+                addDiagnostic(
+                        "HTTP "
+                                + errorResponse.getStatusCode()
+                                + " "
+                                + errorResponse.getReasonPhrase()
+                                + " "
+                                + sanitizeUrl(uri)
+                );
+            }
+            super.onReceivedHttpError(view, request, errorResponse);
         }
 
         @Override
