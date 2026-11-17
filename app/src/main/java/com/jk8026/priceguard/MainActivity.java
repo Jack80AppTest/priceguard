@@ -18,6 +18,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -129,20 +130,22 @@ public class MainActivity extends ComponentActivity {
             return;
         }
 
-        String sanitized = sanitizeDiagnosticText(message);
-        if (diagnosticLog.length() > 0) {
-            diagnosticLog.append("\n");
-        }
-        diagnosticLog.append(sanitized);
+        runOnUiThread(() -> {
+            String sanitized = sanitizeDiagnosticText(message);
+            if (diagnosticLog.length() > 0) {
+                diagnosticLog.append("\n");
+            }
+            diagnosticLog.append(sanitized);
 
-        if (diagnosticLog.length() > 6000) {
-            diagnosticLog.delete(0, diagnosticLog.length() - 6000);
-        }
+            if (diagnosticLog.length() > 9000) {
+                diagnosticLog.delete(0, diagnosticLog.length() - 9000);
+            }
 
-        if (diagnosticView != null) {
-            diagnosticView.setText(diagnosticLog.toString());
-            diagnosticView.setVisibility(TextView.VISIBLE);
-        }
+            if (diagnosticView != null) {
+                diagnosticView.setText(diagnosticLog.toString());
+                diagnosticView.setVisibility(TextView.VISIBLE);
+            }
+        });
     }
 
     private String sanitizeUrl(Uri uri) {
@@ -171,6 +174,52 @@ public class MainActivity extends ComponentActivity {
 
         Uri uri = Uri.parse(url);
         return isPriceGuardUri(uri) && "/auth/confirm".equals(uri.getPath());
+    }
+
+    private boolean isSupabaseUrl(Uri uri) {
+        if (uri == null || uri.getHost() == null) {
+            return false;
+        }
+
+        String host = uri.getHost().toLowerCase(Locale.US);
+        return host.equals("supabase.co") || host.endsWith(".supabase.co");
+    }
+
+    private void installNetworkDiagnosticHooks(WebView view) {
+        if (view == null) {
+            return;
+        }
+
+        String script =
+                "(function(){"
+                        + "if(window.__pgdiagInstalled){return;}"
+                        + "window.__pgdiagInstalled=true;"
+                        + "function clean(u){try{var x=new URL(String(u),location.href);return x.origin+x.pathname;}catch(e){return String(u).split('?')[0];}}"
+                        + "function log(m){try{console.log('PGDIAG '+m);}catch(e){}}"
+                        + "try{"
+                        + "var of=window.fetch;"
+                        + "if(of){window.fetch=function(input,init){"
+                        + "var method=(init&&init.method)||'GET';"
+                        + "var url=(typeof input==='string')?input:(input&&input.url?input.url:String(input));"
+                        + "log('fetch -> '+method+' '+clean(url));"
+                        + "return of.apply(this,arguments).then(function(r){log('fetch <- '+r.status+' '+clean(r.url||url));return r;},function(e){log('fetch !! '+clean(url)+' '+String(e));throw e;});"
+                        + "};}"
+                        + "}catch(e){log('fetch hook error '+String(e));}"
+                        + "try{"
+                        + "var oo=XMLHttpRequest.prototype.open;"
+                        + "var os=XMLHttpRequest.prototype.send;"
+                        + "XMLHttpRequest.prototype.open=function(m,u){this.__pgm=m;this.__pgu=u;return oo.apply(this,arguments);};"
+                        + "XMLHttpRequest.prototype.send=function(){"
+                        + "var self=this;"
+                        + "log('xhr -> '+(self.__pgm||'GET')+' '+clean(self.__pgu||''));"
+                        + "self.addEventListener('loadend',function(){log('xhr <- '+self.status+' '+clean(self.responseURL||self.__pgu||''));});"
+                        + "return os.apply(this,arguments);"
+                        + "};"
+                        + "}catch(e){log('xhr hook error '+String(e));}"
+                        + "log('network hooks installed');"
+                        + "})();";
+
+        view.evaluateJavascript(script, null);
     }
 
     private void runAuthDiagnostic(WebView view) {
@@ -249,6 +298,7 @@ public class MainActivity extends ComponentActivity {
             super.onPageStarted(view, url, favicon);
             if (isAuthConfirmUrl(url)) {
                 addDiagnostic("Début: " + sanitizeUrl(Uri.parse(url)));
+                installNetworkDiagnosticHooks(view);
             }
         }
 
@@ -299,6 +349,47 @@ public class MainActivity extends ComponentActivity {
         }
 
         @Override
+        public WebResourceResponse shouldInterceptRequest(
+                WebView view,
+                WebResourceRequest request
+        ) {
+            Uri requestUri = request.getUrl();
+            if (isAuthConfirmUrl(view != null ? view.getUrl() : null)
+                    && isSupabaseUrl(requestUri)) {
+                addDiagnostic(
+                        "REQ Supabase: "
+                                + request.getMethod()
+                                + " "
+                                + sanitizeUrl(requestUri)
+                );
+            }
+
+            return super.shouldInterceptRequest(view, request);
+        }
+
+        @Override
+        public void onReceivedHttpError(
+                WebView view,
+                WebResourceRequest request,
+                WebResourceResponse errorResponse
+        ) {
+            Uri requestUri = request.getUrl();
+            if (isAuthConfirmUrl(view != null ? view.getUrl() : null)
+                    || isSupabaseUrl(requestUri)) {
+                addDiagnostic(
+                        "HTTP "
+                                + errorResponse.getStatusCode()
+                                + " "
+                                + errorResponse.getReasonPhrase()
+                                + " "
+                                + sanitizeUrl(requestUri)
+                );
+            }
+
+            super.onReceivedHttpError(view, request, errorResponse);
+        }
+
+        @Override
         public void onReceivedError(
                 WebView view,
                 WebResourceRequest request,
@@ -339,16 +430,23 @@ public class MainActivity extends ComponentActivity {
 
         @Override
         public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
-            if (consoleMessage != null
-                    && consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR
+            if (consoleMessage == null) {
+                return super.onConsoleMessage(null);
+            }
+
+            String message = consoleMessage.message();
+            if (message != null && message.startsWith("PGDIAG ")) {
+                addDiagnostic(message.substring(7));
+            } else if (consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR
                     && isAuthConfirmUrl(webView != null ? webView.getUrl() : null)) {
                 addDiagnostic(
                         "JS erreur: "
-                                + consoleMessage.message()
+                                + message
                                 + " @"
                                 + consoleMessage.lineNumber()
                 );
             }
+
             return super.onConsoleMessage(consoleMessage);
         }
 
